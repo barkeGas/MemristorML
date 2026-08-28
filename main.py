@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
@@ -9,7 +10,14 @@ from sklearn.preprocessing import StandardScaler
 
 
 DATA_PATH = Path(__file__).with_name("F2s_7_0.parquet")
+PLOTS_DIRECTORY = Path(__file__).with_name("plots")
 FEATURES = ["start_v", "final_v", "initial_g", "final_g"]
+TARGET_UNITS = {
+    "start_v": "V",
+    "final_v": "V",
+    "initial_g": "S",
+    "final_g": "S",
+}
 
 
 # 1. Ucitavanje celog dataseta
@@ -174,3 +182,108 @@ print(validation_metrics.to_string(float_format=lambda value: f"{value:.6g}"))
 
 print("\n=== LINEAR REGRESSION: TEST METRIKE ===")
 print(test_metrics.to_string(float_format=lambda value: f"{value:.6g}"))
+
+
+# 9. Pet ravnomerno rasporedjenih primera iz hronoloskog test skupa.
+sample_positions = np.linspace(
+    0, len(X_test) - 1, num=5, dtype=int
+)
+
+print("\n=== POJEDINACNI TEST PRIMERI ===")
+for position in sample_positions:
+    cycle = X_test.iloc[[position]].index.get_level_values("Cycle")[0]
+    comparison = pd.DataFrame(
+        {
+            "stvarni_RESET": Y_test.iloc[position],
+            "predvidjeni_RESET": Y_test_predicted.iloc[position],
+        }
+    )
+    comparison["greska"] = (
+        comparison["predvidjeni_RESET"] - comparison["stvarni_RESET"]
+    )
+    comparison["apsolutna_greska"] = comparison["greska"].abs()
+
+    print(f"\n--- Ciklus {cycle} ---")
+    print("SET input:")
+    print(X_test.iloc[position].to_string(float_format=lambda value: f"{value:.6g}"))
+    print("RESET: stvarno, predvidjeno i odstupanje:")
+    print(comparison.to_string(float_format=lambda value: f"{value:.6g}"))
+
+
+# 10. Measured-vs-predicted grafik za ceo test skup.
+PLOTS_DIRECTORY.mkdir(exist_ok=True)
+plot_path = PLOTS_DIRECTORY / "linear_regression_test_predictions.png"
+
+figure, axes = plt.subplots(2, 2, figsize=(11, 9))
+axes = axes.flatten()
+sample_cycles = X_test.iloc[sample_positions].index.get_level_values("Cycle")
+
+for axis, target in zip(axes, FEATURES):
+    actual = Y_test[target]
+    predicted = Y_test_predicted[target]
+    lower = min(actual.min(), predicted.min())
+    upper = max(actual.max(), predicted.max())
+    padding = (upper - lower) * 0.05
+
+    axis.scatter(
+        actual,
+        predicted,
+        alpha=0.35,
+        s=18,
+        label="Svi test ciklusi",
+    )
+    axis.plot(
+        [lower - padding, upper + padding],
+        [lower - padding, upper + padding],
+        linestyle="--",
+        color="black",
+        linewidth=1.2,
+        label="Idealno: y = x",
+    )
+    axis.scatter(
+        actual.iloc[sample_positions],
+        predicted.iloc[sample_positions],
+        s=42,
+        marker="x",
+        linewidths=1.5,
+        label="Izdvojeni primeri",
+    )
+
+    for sample_position, cycle in zip(sample_positions, sample_cycles):
+        axis.annotate(
+            str(cycle),
+            (
+                actual.iloc[sample_position],
+                predicted.iloc[sample_position],
+            ),
+            xytext=(4, 4),
+            textcoords="offset points",
+            fontsize=8,
+        )
+
+    unit = TARGET_UNITS[target]
+    axis.set_title(f"RESET {target}")
+    axis.set_xlabel(f"Stvarna vrednost [{unit}]")
+    axis.set_ylabel(f"Predvidjena vrednost [{unit}]")
+    axis.grid(alpha=0.25)
+    axis.text(
+        0.04,
+        0.96,
+        (
+            f"MAE = {test_metrics.loc[target, 'MAE']:.4g} {unit}\n"
+            f"R2 = {test_metrics.loc[target, 'R2']:.3f}"
+        ),
+        transform=axis.transAxes,
+        verticalalignment="top",
+    )
+
+axes[0].legend(fontsize=8)
+figure.suptitle(
+    "Linearna regresija: stvarni i predvidjeni RESET na test skupu",
+    fontsize=14,
+)
+figure.tight_layout()
+figure.savefig(plot_path, dpi=160, bbox_inches="tight")
+
+print(f"\nGrafik je sacuvan u: {plot_path}")
+plt.show()
