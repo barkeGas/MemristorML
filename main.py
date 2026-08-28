@@ -1,6 +1,11 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 
 DATA_PATH = Path(__file__).with_name("F2s_7_0.parquet")
@@ -120,3 +125,52 @@ print(
     f"{X_validation.index.equals(Y_validation.index)}"
 )
 print(f"Test X/Y indeks poravnat: {X_test.index.equals(Y_test.index)}")
+
+
+# 8. Multi-output linear regression baseline.
+# StandardScaler se fituje samo na X_train unutar pipeline-a.
+linear_model = make_pipeline(StandardScaler(), LinearRegression())
+linear_model.fit(X_train, Y_train)
+
+Y_validation_predicted = pd.DataFrame(
+    linear_model.predict(X_validation),
+    index=Y_validation.index,
+    columns=FEATURES,
+)
+Y_test_predicted = pd.DataFrame(
+    linear_model.predict(X_test),
+    index=Y_test.index,
+    columns=FEATURES,
+)
+
+
+def regression_metrics(y_true, y_predicted):
+    """Racuna metrike zasebno za svaki RESET target."""
+    rows = []
+
+    for target in FEATURES:
+        mse = mean_squared_error(y_true[target], y_predicted[target])
+        rows.append(
+            {
+                "target": target,
+                "MAE": mean_absolute_error(
+                    y_true[target], y_predicted[target]
+                ),
+                "RMSE": np.sqrt(mse),
+                "R2": r2_score(y_true[target], y_predicted[target]),
+            }
+        )
+
+    return pd.DataFrame(rows).set_index("target")
+
+
+validation_metrics = regression_metrics(
+    Y_validation, Y_validation_predicted
+)
+test_metrics = regression_metrics(Y_test, Y_test_predicted)
+
+print("\n=== LINEAR REGRESSION: VALIDATION METRIKE ===")
+print(validation_metrics.to_string(float_format=lambda value: f"{value:.6g}"))
+
+print("\n=== LINEAR REGRESSION: TEST METRIKE ===")
+print(test_metrics.to_string(float_format=lambda value: f"{value:.6g}"))
