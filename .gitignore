@@ -1,0 +1,6 @@
+.venv/
+.idea/
+__pycache__/
+*.pyc
+.DS_Store
+F2s_7_0.parquet
