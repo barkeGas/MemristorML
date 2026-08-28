@@ -74,3 +74,49 @@ print(X.head())
 
 print("\nPrvih 5 redova Y (RESET):")
 print(Y.head())
+
+
+# 7. Hronoloska podela: raniji ciklusi sluze za trening, a kasniji
+# za validaciju i zavrsni test. Redosled se ne mesa (nema shuffle-a).
+cycle_numbers = X.index.get_level_values("Cycle")
+if not cycle_numbers.is_monotonic_increasing:
+    raise ValueError("Ciklusi nisu hronoloski sortirani.")
+
+train_end = int(len(X) * 0.80)
+validation_end = int(len(X) * 0.90)
+
+X_train = X.iloc[:train_end].copy()
+Y_train = Y.iloc[:train_end].copy()
+
+X_validation = X.iloc[train_end:validation_end].copy()
+Y_validation = Y.iloc[train_end:validation_end].copy()
+
+X_test = X.iloc[validation_end:].copy()
+Y_test = Y.iloc[validation_end:].copy()
+
+
+def cycle_range(frame):
+    """Vraca prvi i poslednji broj ciklusa u jednom delu dataseta."""
+    cycles = frame.index.get_level_values("Cycle")
+    return f"{cycles[0]}-{cycles[-1]}"
+
+
+print("\n=== HRONOLOSKA PODELA 80/10/10 ===")
+print(f"Train:      X{X_train.shape}, Y{Y_train.shape}, ciklusi {cycle_range(X_train)}")
+print(
+    f"Validation: X{X_validation.shape}, Y{Y_validation.shape}, "
+    f"ciklusi {cycle_range(X_validation)}"
+)
+print(f"Test:       X{X_test.shape}, Y{Y_test.shape}, ciklusi {cycle_range(X_test)}")
+
+print("\n=== PROVERA PODELE ===")
+print(
+    "Ukupan broj redova je sacuvan: "
+    f"{len(X_train) + len(X_validation) + len(X_test) == len(X)}"
+)
+print(f"Train X/Y indeks poravnat: {X_train.index.equals(Y_train.index)}")
+print(
+    "Validation X/Y indeks poravnat: "
+    f"{X_validation.index.equals(Y_validation.index)}"
+)
+print(f"Test X/Y indeks poravnat: {X_test.index.equals(Y_test.index)}")
