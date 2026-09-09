@@ -16,9 +16,9 @@ FEATURES = ["start_v", "final_v", "initial_g", "final_g"]
 data = pd.read_parquet(DATA_PATH)
 
 print("=== DATASET ===")
-print(f"Fajl: {DATA_PATH.name}")
-print(f"Broj redova: {len(data)}")
-print(f"Broj kolona: {data.shape[1]}")
+print(f"File: {DATA_PATH.name}")
+print(f"Number of rows: {len(data)}")
+print(f"Number of columns: {data.shape[1]}")
 
 
 X = data.loc[:, [("SET", feature) for feature in FEATURES]].copy()
@@ -28,7 +28,7 @@ X.columns = FEATURES
 Y.columns = FEATURES
 
 
-print("\n=== NaN PREGLED PRE FILTRIRANJA ===")
+print("\n=== NaN REVIEW BEFORE FILTERING ===")
 print("X (SET):")
 print(X.isna().sum())
 print("\nY (RESET):")
@@ -40,7 +40,7 @@ error_flags = data.loc[
 ].copy()
 error_flags.columns = ["SET_has_error", "RESET_has_error"]
 
-print("\n=== has_error PREGLED ===")
+print("\n=== has_error REVIEW ===")
 for column in error_flags.columns:
     print(f"{column}=True: {int(error_flags[column].eq(True).sum())}")
     print(f"{column}=NaN:  {int(error_flags[column].isna().sum())}")
@@ -50,32 +50,32 @@ has_nan = X.isna().any(axis=1) | Y.isna().any(axis=1)
 has_error = error_flags.fillna(True).astype(bool).any(axis=1)
 valid_rows = ~(has_nan | has_error)
 
-print("\n=== FILTRIRANJE ===")
-print(f"Redovi sa NaN u X ili Y: {int(has_nan.sum())}")
-print(f"Redovi sa SET/RESET greskom: {int(has_error.sum())}")
-print(f"Ukupno izbaceno redova: {int((~valid_rows).sum())}")
+print("\n=== FILTERING ===")
+print(f"Rows with NaN in X or Y: {int(has_nan.sum())}")
+print(f"Rows with a SET/RESET error: {int(has_error.sum())}")
+print(f"Total rows removed: {int((~valid_rows).sum())}")
 
 X = X.loc[valid_rows].copy()
 Y = Y.loc[valid_rows].copy()
 
 
-print("\n=== KONACNI X I Y ===")
+print("\n=== FINAL X AND Y ===")
 print(f"X shape: {X.shape}")
 print(f"Y shape: {Y.shape}")
-print(f"X i Y imaju isti indeks: {X.index.equals(Y.index)}")
-print(f"Preostali NaN u X: {int(X.isna().sum().sum())}")
-print(f"Preostali NaN u Y: {int(Y.isna().sum().sum())}")
+print(f"X and Y have the same index: {X.index.equals(Y.index)}")
+print(f"Remaining NaN values in X: {int(X.isna().sum().sum())}")
+print(f"Remaining NaN values in Y: {int(Y.isna().sum().sum())}")
 
-print("\nPrvih 5 redova X (SET):")
+print("\nFirst 5 rows of X (SET):")
 print(X.head())
 
-print("\nPrvih 5 redova Y (RESET):")
+print("\nFirst 5 rows of Y (RESET):")
 print(Y.head())
 
 
 cycle_numbers = X.index.get_level_values("Cycle")
 if not cycle_numbers.is_monotonic_increasing:
-    raise ValueError("Ciklusi nisu hronoloski sortirani.")
+    raise ValueError("Cycles are not sorted chronologically.")
 
 train_end = int(len(X) * 0.80)
 validation_end = int(len(X) * 0.90)
@@ -95,25 +95,25 @@ def cycle_range(frame):
     return f"{cycles[0]}-{cycles[-1]}"
 
 
-print("\n=== HRONOLOSKA PODELA 80/10/10 ===")
-print(f"Train:      X{X_train.shape}, Y{Y_train.shape}, ciklusi {cycle_range(X_train)}")
+print("\n=== CHRONOLOGICAL 80/10/10 SPLIT ===")
+print(f"Train:      X{X_train.shape}, Y{Y_train.shape}, cycles {cycle_range(X_train)}")
 print(
     f"Validation: X{X_validation.shape}, Y{Y_validation.shape}, "
-    f"ciklusi {cycle_range(X_validation)}"
+    f"cycles {cycle_range(X_validation)}"
 )
-print(f"Test:       X{X_test.shape}, Y{Y_test.shape}, ciklusi {cycle_range(X_test)}")
+print(f"Test:       X{X_test.shape}, Y{Y_test.shape}, cycles {cycle_range(X_test)}")
 
-print("\n=== PROVERA PODELE ===")
+print("\n=== SPLIT VERIFICATION ===")
 print(
-    "Ukupan broj redova je sacuvan: "
+    "Total number of rows is preserved: "
     f"{len(X_train) + len(X_validation) + len(X_test) == len(X)}"
 )
-print(f"Train X/Y indeks poravnat: {X_train.index.equals(Y_train.index)}")
+print(f"Train X/Y indices aligned: {X_train.index.equals(Y_train.index)}")
 print(
-    "Validation X/Y indeks poravnat: "
+    "Validation X/Y indices aligned: "
     f"{X_validation.index.equals(Y_validation.index)}"
 )
-print(f"Test X/Y indeks poravnat: {X_test.index.equals(Y_test.index)}")
+print(f"Test X/Y indices aligned: {X_test.index.equals(Y_test.index)}")
 
 
 linear_model = make_pipeline(StandardScaler(), LinearRegression())
@@ -155,10 +155,10 @@ validation_metrics = regression_metrics(
 )
 test_metrics = regression_metrics(Y_test, Y_test_predicted)
 
-print("\n=== LINEAR REGRESSION: VALIDATION METRIKE ===")
+print("\n=== LINEAR REGRESSION: VALIDATION METRICS ===")
 print(validation_metrics.to_string(float_format=lambda value: f"{value:.6g}"))
 
-print("\n=== LINEAR REGRESSION: TEST METRIKE ===")
+print("\n=== LINEAR REGRESSION: TEST METRICS ===")
 print(test_metrics.to_string(float_format=lambda value: f"{value:.6g}"))
 
 
@@ -166,24 +166,24 @@ sample_positions = np.linspace(
     0, len(X_test) - 1, num=5, dtype=int
 )
 
-print("\n=== POJEDINACNI TEST PRIMERI ===")
+print("\n=== INDIVIDUAL TEST ===")
 for position in sample_positions:
     cycle = X_test.iloc[[position]].index.get_level_values("Cycle")[0]
     comparison = pd.DataFrame(
         {
-            "stvarni_RESET": Y_test.iloc[position],
-            "predvidjeni_RESET": Y_test_predicted.iloc[position],
+            "actual_RESET": Y_test.iloc[position],
+            "predicted_RESET": Y_test_predicted.iloc[position],
         }
     )
-    comparison["greska"] = (
-        comparison["predvidjeni_RESET"] - comparison["stvarni_RESET"]
+    comparison["error"] = (
+        comparison["predicted_RESET"] - comparison["actual_RESET"]
     )
-    comparison["apsolutna_greska"] = comparison["greska"].abs()
+    comparison["absolute_error"] = comparison["error"].abs()
 
-    print(f"\n--- Ciklus {cycle} ---")
+    print(f"\n--- Cycle {cycle} ---")
     print("SET input:")
     print(X_test.iloc[position].to_string(float_format=lambda value: f"{value:.6g}"))
-    print("RESET: stvarno, predvidjeno i odstupanje:")
+    print("RESET: actual, predicted, and error:")
     print(comparison.to_string(float_format=lambda value: f"{value:.6g}"))
 
 
@@ -209,7 +209,7 @@ X_random_train, X_random_remaining, Y_random_train, Y_random_remaining = (
     shuffle=True,
 )
 
-print("\n=== RANDOM PODELA 80/10/10 (random_state=42) ===")
+print("\n=== RANDOM 80/10/10 SPLIT (random_state=42) ===")
 print(f"Train:      X{X_random_train.shape}, Y{Y_random_train.shape}")
 print(
     f"Validation: X{X_random_validation.shape}, "
@@ -217,15 +217,15 @@ print(
 )
 print(f"Test:       X{X_random_test.shape}, Y{Y_random_test.shape}")
 print(
-    "Random train X/Y indeks poravnat: "
+    "Random train X/Y indices aligned: "
     f"{X_random_train.index.equals(Y_random_train.index)}"
 )
 print(
-    "Random validation X/Y indeks poravnat: "
+    "Random validation X/Y indices aligned: "
     f"{X_random_validation.index.equals(Y_random_validation.index)}"
 )
 print(
-    "Random test X/Y indeks poravnat: "
+    "Random test X/Y indices aligned: "
     f"{X_random_test.index.equals(Y_random_test.index)}"
 )
 
@@ -250,13 +250,13 @@ random_test_metrics = regression_metrics(
     Y_random_test, Y_random_test_predicted
 )
 
-print("\n=== RANDOM LINEAR REGRESSION: VALIDATION METRIKE ===")
+print("\n=== RANDOM LINEAR REGRESSION: VALIDATION METRICS ===")
 print(
     random_validation_metrics.to_string(
         float_format=lambda value: f"{value:.6g}"
     )
 )
-print("\n=== RANDOM LINEAR REGRESSION: TEST METRIKE ===")
+print("\n=== RANDOM LINEAR REGRESSION: TEST METRICS ===")
 print(
     random_test_metrics.to_string(
         float_format=lambda value: f"{value:.6g}"
@@ -276,7 +276,7 @@ split_comparison["R2_change"] = (
     random_test_metrics["R2"] - test_metrics["R2"]
 )
 
-print("\n=== HRONOLOSKI VS RANDOM TEST ===")
+print("\n=== CHRONOLOGICAL VS RANDOM TEST ===")
 print(
     split_comparison.to_string(
         float_format=lambda value: f"{value:.6g}"
