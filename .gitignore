@@ -3,5 +3,33 @@
 __pycache__/
 *.pyc
 .DS_Store
-F2s_7_0.parquet
+
+# Experimental data are intentionally kept outside Git.
+*.parquet
+data/*
+!data/README.md
+
+# Local credentials and environment files.
+.env
+.env.*
+*.pem
+*.key
+secrets.*
+
+# Generated output that is not part of the curated documentation.
 plots/
+
+# LaTeX build files.
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+
+# Test, lint, and notebook caches.
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
