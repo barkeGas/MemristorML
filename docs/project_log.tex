@@ -20,7 +20,7 @@
 
 \title{MemristorML\\Project Documentation and Work Log}
 \author{Nikola Bari\v{s}i\'{c}}
-\date{Updated: 9 September 2026}
+\date{Updated: 11 September 2026}
 
 \begin{document}
 
@@ -30,9 +30,9 @@
 
 \section{Project objective}
 
-The project investigates whether switching characteristics of a memristor can
+The project investigates whether switching characteristics of a memristor device can
 be predicted from measurements available earlier in the device's switching
-sequence. The first phase studies the same-cycle mapping
+sequence. The first phase studies the same-cycle mapping, where we try to predict the values for the RESET operation based off of given values of the respective SET operation:
 
 \[
 X_{\mathrm{SET},n}
@@ -47,7 +47,7 @@ where both vectors contain
 G_{\mathrm{final}}].
 \]
 
-The second phase introduces a one-step temporal mapping:
+The second phase is concerned with what happens between the cycles. For the given RESET operation's parameters, we try to predict the SET operation's parameters from the next respective cycle :
 
 \[
 X_{\mathrm{RESET},n}
@@ -55,23 +55,18 @@ X_{\mathrm{RESET},n}
 Y_{\mathrm{SET},n+1}.
 \]
 
-Linear regression is used as an interpretable baseline before introducing a
-small multi-output multilayer perceptron (MLP). Chronological and random data
-splits are treated as different experimental protocols rather than as simple
-reorderings of the same training rows.
+For exploring the possibility of predicting these values as accurately as possible, we use the Linear Regression machine learning model. In the latter stages of the project, we will try to introduce the MLP model, in the hopes of getting more precise data prediction.
 
 \section{Dataset}
 
-The experiments use \texttt{F2s\_7\_0.parquet}. The dataset contains 5695
-cycles and 19 extracted switching metrics. Its columns form a Pandas
-MultiIndex with separate \texttt{SET} and \texttt{RESET} groups. Each row is
-indexed by the experimental conditions, device identifier, and cycle number:
+The experiments use \texttt{F2s\_7\_0.parquet} file, where the switching characteristics of one device have been recorded. The dataset contains 5695 cycles and 19 extracted switching metrics. Its columns form a Pandas
+MultiIndex with separate \texttt{SET} and \texttt{RESET} groups. Each row is indexed by the experimental conditions, device identifier, and cycle number:
 \texttt{RESET\_pw}, \texttt{RESET\_target}, \texttt{Device}, and
 \texttt{Cycle}.
 
 \subsection{Selected inputs and targets}
 
-Both prediction tasks use the following four quantities on each side:
+For the predicitons, we use the following four parameters that we have already mentioned above:
 
 \begin{center}
 \begin{tabular}{ll}
@@ -86,17 +81,12 @@ Input features & Target quantities \\
 \end{tabular}
 \end{center}
 
-Voltage quantities are reported in volts (V), and conductance quantities are
-reported in siemens (S).
+Starting and final voltages are in volts (V), conductances are in siemens (S).
 
 \section{Data validation and filtering}
+Filtering only takes into account the values which are needed for our model. While the recorded data has a total of 19 metrics for each SET and RESET operation combined (so, per cycle), only 8 of those are used. If at least one of the other 11 metrics is \textbf{NaN} (Not a Number), the cycle will not be discarded as those parameters, at the moment, pose no use for us. Only when at least 1 of the 8 used values is affected by the raised \textbf{has\_error} flag or the \textbf{NaN} statement, do we discard the given cycle.
 
-Filtering considers only the quantities used by a given model and their
-relevant \texttt{has\_error} flags. Missing values in unused metrics do not
-cause a cycle to be discarded.
-
-For the same-cycle task, a row is valid only when all four SET inputs, all four
-RESET targets, and both error flags are valid.
+For a given cycle, a row is valid only when all four SET and RESET metrics and both error flags are valid.
 
 \begin{table}[H]
 \centering
@@ -113,14 +103,13 @@ Valid cycles after filtering & 5686 \\
 \end{tabular}
 \end{table}
 
-After filtering, both $X$ and $Y$ have shape $5686\times4$, have identical
-indices, and contain no remaining NaN values.
+After filtering, both $X$ and $Y$ have shape $5686\times4$, meaning 9 cycles have been discarded.
 
-\section{Linear regression baseline}
+\section{Linear regression model}
 
-The baseline is a multi-output \texttt{LinearRegression} model from
-scikit-learn. Input features are standardized with \texttt{StandardScaler}.
-The scaler is fitted on the training inputs, and the learned transformation is
+The used model is a multi-output \texttt{Linear Regression} model from
+scikit-learn. Input features are standardized with \texttt{StandardScaler} (this will potentially be useful once we switch to the MLP model later on.
+The training inputs are standardized, the learned transformation is
 then applied to validation and test inputs.
 
 For a standardized input vector $z$, the model predicts
@@ -129,25 +118,24 @@ For a standardized input vector $z$, the model predicts
 \hat{y}=Wz+b,
 \]
 
-where $W\in\mathbb{R}^{4\times4}$ and $b\in\mathbb{R}^{4}$. Each target has
-its own linear combination of the four inputs. The four output regressions are
+where $W\in\mathbb{R}^{4\times4}$ is the weight matrix and $b\in\mathbb{R}^{4\times1}$ is the bias matrix. Each target has
+its own linear combination of the four inputs, since we have 4 outputs. The four output equations are
 mathematically independent, although scikit-learn fits them through one
 multi-output model call.
 
-Evaluation is reported separately for every target. The metrics used during
-the project are mean absolute error (MAE), mean squared error (MSE), root mean
-squared error (RMSE), and the coefficient of determination $R^2$.
+Error evaluation is done for each of the four target values that we are trying to predict . The metrics used during the project are mean absolute error (MAE), mean squared error (MSE), root mean
+squared error (RMSE), and the coefficient of determination $R^2$ .
 
 \section{Phase I: same-cycle SET to RESET prediction}
 
 \subsection{Experiment A: chronological split}
 
-The chronological split preserves the temporal order. The model is fitted on
-earlier cycles, validated on the middle portion, and tested on later cycles.
+The chronological split preserves the order in which the data was collected. The model is fitted on
+the first 4548 cycles (80\%), validated on 569 cycles (10\%)  and tested on 569 cycles (10\%)
 
 \begin{table}[H]
 \centering
-\caption{Chronological 80/10/10 split for the same-cycle task.}
+\caption{Chronological data split for the same-cycle test}
 \begin{tabular}{lrr}
 \toprule
 Subset & Number of examples & Cycles \\
@@ -159,7 +147,7 @@ Test & 569 & 5126--5694 \\
 \end{tabular}
 \end{table}
 
-\subsubsection{Results}
+\subsubsection{Evaluation results for the 4 parameters are given in the table below:}
 
 \begin{table}[H]
 \centering
@@ -183,12 +171,11 @@ RESET target & MAE & RMSE & $R^2$ \\
 \label{fig:chronological-predictions}
 \end{figure}
 
-\subsubsection{Interpretation}
+\subsubsection{Physical interpretation}
 
 \texttt{start\_v} has a strong linear signal, whereas \texttt{final\_v} is
-only partially predictable. The almost perfect result for
-\texttt{initial\_g} is not sufficient evidence of model quality because the
-device physics gives the approximate relation
+somewhat predictable. The almost perfect result for
+\texttt{initial\_g} is not surprising - we can assume based on the physics of the device that the final conductance during the SET operation is almost exactly equal to the starting conductance during the RESET operation:
 
 \[
 G_{\mathrm{final,SET}}
@@ -196,19 +183,15 @@ G_{\mathrm{final,SET}}
 G_{\mathrm{initial,RESET}}.
 \]
 
-Directly copying \texttt{SET final\_g} to \texttt{RESET initial\_g} already
-gives $R^2=0.99866$ on the chronological test set. For \texttt{final\_g}, the
+Giving us a score $R^2=0.99866$, for the chronological test set. For \texttt{final\_g}, the
 linear model mostly predicts values close to the mean and does not track the
 cycle-to-cycle variation.
 
 \subsection{Experiment B: random split}
 
-The same valid dataset is split randomly in an 80/10/10 ratio with
-\texttt{random\_state=42}. Each subset contains cycles drawn from the full
-temporal range. The subset sizes remain 4548 training, 569 validation, and 569
-test examples.
+In this experiment, we tried to do something that was, at first, thought to give an interesting result that may differ from the one in the first experiment. The idea was simple: instead of taking the recorded switching data and feeding it into the model chronologically, we first randomly shuffled the switching cycles. After that, the model was trained on data that wasn't in order, at all. The important thing to note is that the respective SET->RESET datasets have remained in order.
 
-\subsubsection{Results}
+\subsubsection{Evaluation results for the 4 parameters are given in the table below:}
 
 \begin{table}[H]
 \centering
@@ -232,7 +215,7 @@ RESET target & MAE & RMSE & $R^2$ \\
 \label{fig:random-predictions}
 \end{figure}
 
-\subsection{Comparison of split protocols}
+\subsection{Comparison of the experiments}
 
 \begin{table}[H]
 \centering
@@ -261,15 +244,13 @@ Target & Chron. MAE & Random MAE & MAE change & Chron. $R^2$ & Random $R^2$ \\
 The random split reduces MAE for \texttt{final\_v} by 23.60\% and for
 \texttt{final\_g} by 19.53\%. The change for \texttt{start\_v} is small,
 whereas \texttt{initial\_g} MAE increases by 11.50\%. These results do not
-support a general conclusion that the random protocol is better for every
+support a general conclusion that the random split is better for every
 target. The two test sets contain different cycles and have different target
 variances, which also affects $R^2$.
 
-\subsection{Methodological correction: order versus subset composition}
+\subsection{Conclusion of the experiments}
 
-For ordinary linear regression, the order of identical paired training rows
-must be distinguished from the composition of the training, validation, and
-test subsets. Let $P$ be a permutation matrix that only changes row order:
+After carefully considering the given problem from a purely mathematical point of view, we have come to a conclusion - the model that was trained on chronological data and the model that was trained on randomly-sampled data do not differ. For ordinary linear regression, the order in which the training data is fed into the model does not matter -  as long as the elements of the training data set are identical. Let's take a look at the proof for why that is. Let $P$ be a permutation matrix that only changes row order:
 
 \[
 X'=PX,
@@ -277,7 +258,7 @@ X'=PX,
 Y'=PY.
 \]
 
-Because $P^TP=I$,
+Because of the identity $P^TP=I$, further we have:
 
 \[
 X'^TX'=X^TP^TPX=X^TX
@@ -289,23 +270,11 @@ and
 X'^TY'=X^TP^TPY=X^TY.
 \]
 
-The normal equations, optimal weights, and biases therefore remain unchanged.
-The mean and standard deviation used by \texttt{StandardScaler} are also
-independent of the order of identical training examples. Only negligible
-floating-point differences may occur.
-
-Consequently, the difference between the chronological and random results was
-not caused by presenting cycles in a different order. The experiments contain
-different members in their training, validation, and test subsets. This
-changes the training statistics, $X^TX$, $X^TY$, the fitted parameters, and
-the target distribution of the test set. The chronological protocol measures
-generalization from earlier to later cycles, whereas the random protocol
-measures interpolation among randomly selected cycles of the same device.
+The normal equations, weights and biases therefore must remain the same. Consequently, the difference in the evaluation results between the two experiments arises in the fact that the training, validation and test data is not the same. Since we randomly shuffled the switching cycle data, the elements in the respective sets between the experiments are different, therefore we get, at first glance, different results.
 
 \section{Phase II: previous-cycle RESET to next-cycle SET prediction}
 
-The second task predicts the SET characteristics of cycle $n+1$ from the RESET
-characteristics of cycle $n$:
+The next question in the project that naturally arises is this: given the parameters of a RESET operation, can we predict the values of the SET operation of the next cycle? In other words, given the RESET characteristics of cycle $n$, can we predict the SET characteristics of cycle $n+1$ ?
 
 \[
 \begin{bmatrix}
@@ -323,41 +292,24 @@ G_{\mathrm{final}}
 \end{bmatrix}_{\mathrm{SET},n+1}.
 \]
 
-\subsection{Temporal pair construction}
+\subsection{Data manipulaton}
 
-RESET inputs are shifted within each experimental group, defined by
-\texttt{RESET\_pw}, \texttt{RESET\_target}, and \texttt{Device}. This prevents
-the final RESET event of one device or experimental configuration from being
-paired with the first SET event of another group. A pair is retained only when
-the target cycle is exactly one larger than the input cycle.
+In order to properly load the data into the model, the RESET characteristics used for prediction need to be assigned to the SET characteristics of the next given cycle. To accomplish that, we shift the columns that contain the RESET data, down by one row. That way, the RESET data from cycle $n$ is paired with the SET data from cycle $n+1$ . Also it is worth noting that, since we have shifted all the data down by one row, that one cycle will now be rendered obsolete, as the first SET will no longer have a corresponding value for the RESET characteristic, and the last RESET will not have a corresponding  SET characteristic.
 
-\begin{table}[H]
-\centering
-\caption{Validation of temporal RESET-to-next-SET pairs.}
-\begin{tabular}{lr}
-\toprule
-Item & Number \\
-\midrule
-Initial rows & 5695 \\
-Experimental groups & 1 \\
-Rows without a previous RESET cycle & 1 \\
-Nonconsecutive candidate pairs & 0 \\
-Candidate pairs with NaN values & 14 \\
-Candidate pairs with errors & 0 \\
-Valid temporal pairs & 5680 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Every retained input was independently checked against the raw RESET values of
-cycle $n$, and every retained target was checked against the raw SET values of
-cycle $n+1$. All 5680 cycle differences are exactly one.
+To verify that the shift was performed correctly, the RESET->SET pairs
+were independently reconstructed row by row without using
+\texttt{groupby(...).shift(1)}. Both methods produced identical $X$ and
+$Y$ datasets. Of the 5694 consecutive candidate pairs, 14 were excluded
+because of NaN values and none because of error flags, leaving 5680 valid
+pairs. The test subset begins with
+$\mathrm{RESET}_{5126}\rightarrow\mathrm{SET}_{5127}$ and ends with
+$\mathrm{RESET}_{5693}\rightarrow\mathrm{SET}_{5694}$.
 
 \subsection{Chronological split and model}
 
 \begin{table}[H]
 \centering
-\caption{Chronological 80/10/10 split for the temporal task.}
+\caption{Chronological split of data}
 \begin{tabular}{lrrr}
 \toprule
 Subset & Examples & RESET input cycles & SET target cycles \\
@@ -370,7 +322,7 @@ Test & 568 & 5126--5693 & 5127--5694 \\
 \end{table}
 
 The model uses the same \texttt{StandardScaler} and multi-output linear
-regression pipeline as Phase I. The input scaler is fitted on the 4544 training
+regression as in Phase I. The input scaler is fitted on the 4544 training
 pairs. Targets remain in their original physical units.
 
 \subsection{Test results}
@@ -382,12 +334,11 @@ Relative MAE is defined as
 =100\frac{\mathrm{MAE}}{\operatorname{mean}(|y_{\mathrm{true}}|)}.
 \]
 
-This quantity is not MAPE. It avoids dividing separately by potentially tiny
-individual conductance values and handles signed voltage targets consistently.
+This quantity describes how large the average error is, compared to the mean of the true target values, in percentage. If the relative MAE was, let's say, 100\%, that would mean that the average error of our predicted values is equal to the magnitude of the mean of the true target values. In essence, the prediction errors would be of the same scale as the values we are trying to predict, indicating a very poor result.
 
 \begin{table}[H]
 \centering
-\caption{Temporal linear regression on the chronological test set.}
+\caption{Linear regression on the test set}
 \begin{tabular}{lrrrr}
 \toprule
 SET target & MSE & RMSE & Relative MAE & $R^2$ \\
@@ -400,8 +351,7 @@ SET target & MSE & RMSE & Relative MAE & $R^2$ \\
 \end{tabular}
 \end{table}
 
-MSE has squared target units: V$^2$ for voltage targets and S$^2$ for
-conductance targets.
+MSE has squared target units: V$^2$ for voltage targets and S$^2$ for conductance targets.
 
 \begin{figure}[H]
 \centering
@@ -417,56 +367,193 @@ conductance targets.
 \label{fig:reset-next-set-metrics}
 \end{figure}
 
-\subsection{Interpretation}
+\subsection{Physical interpretation}
 
-Among the four targets, \texttt{final\_v} has the strongest temporal linear
-signal, with $R^2=0.585$. The linear model explains less of the variation in
-\texttt{start\_v} and \texttt{initial\_g}. The weakest result is obtained for
-\texttt{final\_g}, with $R^2=0.149$ and a relative MAE of 14.97\%. The previous
-RESET event therefore contains useful information about the next SET event,
-but a linear mapping does not explain most of the variation for all targets.
-This provides a justified baseline for a later nonlinear MLP experiment.
+Among the four targets, \texttt{final\_v} has the strongest linear signal, with $R^2=0.585$. The linear model explains less of the variation in \texttt{start\_v} and \texttt{initial\_g}. The weakest result is obtained for
+\texttt{final\_g}, with $R^2=0.149$ and a relative MAE of 14.97\%. The physical interpretation for such a poor result for the final conductance is yet to be understood. This indicates that the MLP model might do us justice, by providing us with overall better results, especially for the final conductance parameter \texttt{final\_g}.
 
-\section{Decisions}
+\section{Comparison of measurements and predictions over time}
 
-\begin{itemize}
-    \item Metrics are reported separately for every target because voltage and
-    conductance use different physical units and scales.
-    \item Input scalers are fitted on training inputs only.
-    \item Chronological and random protocols remain separate because they
-    answer different research questions.
-    \item Reordering identical training examples does not change the
-    least-squares solution; changing subset membership does.
-    \item \texttt{RESET initial\_g} is not used as the main evidence of Phase I
-    model quality because of its direct physical relationship with
-    \texttt{SET final\_g}.
-    \item Temporal pairs are constructed within experimental groups and must
-    connect consecutive cycles only.
-    \item Relative MAE is reported with its explicit normalization formula and
-    is not labelled as MAPE.
-    \item Tables and figures accompany every major experiment.
-\end{itemize}
+In the figure below, we show how the models predict the device's behaviour, over a cycle period of 568 cycles. We can notice that the models clearly follows certain trends in the devices behaviour, namely following the sudden spikes in values for the final conductance \texttt{final\_g}, final voltage \texttt{final\_v} and starting voltage \texttt{start\_v}. Unfortunately as we have already seen before, the prediction for the final conductance parameter \texttt{final\_g} doesn't fails to show signs of it working, therefore it is a straight line passing through its mean.
 
-\section{Next steps}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\textwidth]{linear_regression_cycle_series_predictions.png}
+\caption{Measured and predicted \texttt{final\_g}, \texttt{final\_v}, and
+\texttt{start\_v} over chronological test cycles 5127--5694. The conductance
+panel uses a logarithmic vertical scale.}
+\label{fig:cycle-series-predictions}
+\end{figure}
 
-\begin{enumerate}
-    \item Complete the line-by-line audit of the temporal linear regression
-    code and its metrics.
-    \item Add a mean baseline and relevant physics-based baselines.
-    \item Empirically verify row-order invariance by fitting the same linear
-    model before and after permuting identical training pairs.
-    \item Repeat the random split with multiple seeds and report the mean and
-    standard deviation of every metric.
-    \item Implement a small multi-output MLP, initially
-    $4\rightarrow16\rightarrow16\rightarrow4$.
-    \item Standardize both inputs and targets for the MLP using statistics
-    fitted on the training subset.
-    \item Select the MLP with the validation subset and early stopping, then
-    evaluate the selected configuration once on the test subset.
-    \item Compare the MLP with the mean, physics-based, and linear baselines
-    under matching split protocols.
-    \item Later extend the temporal context beyond one previous RESET event.
-\end{enumerate}
+\section{Learned augmented parameter matrices - the math behind the curtain}
+
+In order to understand what truly lies behind the models which we are using, we will have to go over some basic linear algebra. Assume that the training set contains $n$ examples (cycles). The four input parameters of all the examples are arranged into the matrix
+
+\[
+X=
+\begin{bmatrix}
+x_{11} & x_{12} & x_{13} & x_{14} \\
+x_{21} & x_{22} & x_{23} & x_{24} \\
+\vdots & \vdots & \vdots & \vdots \\
+x_{n1} & x_{n2} & x_{n3} & x_{n4}
+\end{bmatrix}
+\in\mathbb{R}^{n\times4}.
+\]
+
+Each row represents one training example, while the four columns represent \texttt{start\_v}, \texttt{final\_v}, \texttt{initial\_g}, and \texttt{final\_g}. The corresponding target values are arranged in a matrix of the same dimensions
+
+\[
+Y=
+\begin{bmatrix}
+y_{11} & y_{12} & y_{13} & y_{14} \\
+y_{21} & y_{22} & y_{23} & y_{24} \\
+\vdots & \vdots & \vdots & \vdots \\
+y_{n1} & y_{n2} & y_{n3} & y_{n4}
+\end{bmatrix}
+\in\mathbb{R}^{n\times4}.
+\]
+
+To include the bias terms in the same matrix multiplication, a column of ones is added to $X$:
+
+\[
+\widetilde{X}=
+\begin{bmatrix}
+1 & x_{11} & x_{12} & x_{13} & x_{14} \\
+1 & x_{21} & x_{22} & x_{23} & x_{24} \\
+\vdots & \vdots & \vdots & \vdots & \vdots \\
+1 & x_{n1} & x_{n2} & x_{n3} & x_{n4}
+\end{bmatrix}
+\in\mathbb{R}^{n\times5}.
+\]
+
+We do this trick in order to contain all the parameters of interests - the weights and the biases, into a single matrix \textit{B}. Therefore the \textit{B} matrix and the predictions for all $n$ examples can be written as
+
+\[
+\widehat{Y}=\widetilde{X}B,
+\qquad B\in\mathbb{R}^{5\times4}.
+\]
+
+The matrix dimensions show how the complete prediction matrix is produced:
+
+\[
+\underbrace{\widetilde{X}}_{n\times5}
+\underbrace{B}_{5\times4}
+=
+\underbrace{\widehat{Y}}_{n\times4}.\]
+The matrix \textit{B} is as follows:
+\[
+B=
+\begin{bmatrix}
+b_1 & b_2 & b_3 & b_4 \\
+w_{11} & w_{12} & w_{13} & w_{14} \\
+w_{21} & w_{22} & w_{23} & w_{24} \\
+w_{31} & w_{32} & w_{33} & w_{34} \\
+w_{41} & w_{42} & w_{43} & w_{44}
+\end{bmatrix}
+\in\mathbb{R}^{5\times4}.
+\]
+
+The first row of $B$ contains the four biases for the respective four equations that the equation above produces. The remaining rows contain the weights of the four inputs and the columns correspond to the
+four predicted target quantities. Internally, the code standardizes every input column according to $z_{ik}=(x_{ik}-\mu_k)/\sigma_k$, forming the standardized input matrix $Z\in\mathbb{R}^{n\times4}$. After adding the bias column, the same predictions can be written as $\widehat{Y}=\widetilde{Z}B_z$. The matrices $B$ and $B_z$ therefore represent the same linear regression model in two different input coordinate systems: $B$ operates on the original input matrix $X$, whereas $B_z$ operates on the standardized input matrix $Z$. Standardization centres each input column around zero and scales it to unit standard deviation, which is important because volts and siemens differ by orders of magnitude. In both cases, the predicted target values remain in their original physical units.
+
+If the weight matrix is written with targets as rows and inputs as columns, the two
+representations satisfy
+
+\[W=W_z\operatorname{diag}(\sigma^{-1}),\qquad
+b=b_z-W\mu.
+\]
+
+The magnitudes in different target columns must not be compared directly, because voltage and conductance targets use different physical units. The tables retain scientific notation instead of rescaling the physical data.
+
+\subsection{SET to RESET model}
+
+\begin{table}[H]
+\centering
+\scriptsize
+\caption{Internal standardized-input augmented matrix $B_z$ for
+$\mathrm{SET}_n\rightarrow\mathrm{RESET}_n$.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrr}
+\toprule
+Parameter row & RESET \texttt{start\_v} & RESET \texttt{final\_v} &
+RESET \texttt{initial\_g} & RESET \texttt{final\_g} \\
+\midrule
+Bias                  & $1.1721086$ & $1.7767700$ & $2.6898178\times10^{-4}$ & $8.9399441\times10^{-6}$ \\
+SET \texttt{start\_v}   & $1.9543311\times10^{-2}$ & $4.2241702\times10^{-2}$ & $-5.4512434\times10^{-8}$ & $-1.9298358\times10^{-8}$ \\
+SET \texttt{final\_v}   & $-2.0441284\times10^{-1}$ & $-2.7270190\times10^{-1}$ & $1.0192870\times10^{-7}$ & $1.6598288\times10^{-7}$ \\
+SET \texttt{initial\_g} & $-1.0351631\times10^{-4}$ & $2.0022936\times10^{-2}$ & $-6.9786432\times10^{-8}$ & $5.2379760\times10^{-8}$ \\
+SET \texttt{final\_g}   & $-6.8304250\times10^{-3}$ & $-4.0695782\times10^{-2}$ & $1.0009195\times10^{-4}$ & $-1.1126113\times10^{-9}$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\begin{table}[H]
+\centering
+\scriptsize
+\caption{Original-input augmented matrix $B$ for
+$\mathrm{SET}_n\rightarrow\mathrm{RESET}_n$.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrr}
+\toprule
+Parameter row & RESET \texttt{start\_v} & RESET \texttt{final\_v} &
+RESET \texttt{initial\_g} & RESET \texttt{final\_g} \\
+\midrule
+Bias                  & $2.0573439\times10^{-1}$ & $5.1256009\times10^{-1}$ & $1.5831693\times10^{-7}$ & $9.3195431\times10^{-6}$ \\
+SET \texttt{start\_v}   & $8.8399891\times10^{-2}$ & $1.9107110\times10^{-1}$ & $-2.4657507\times10^{-7}$ & $-8.7291900\times10^{-8}$ \\
+SET \texttt{final\_v}   & $-7.7622641\times10^{-1}$ & $-1.0355436$ & $3.8705861\times10^{-7}$ & $6.3029452\times10^{-7}$ \\
+SET \texttt{initial\_g} & $-8.6556905\times10^{1}$ & $1.6742516\times10^{4}$ & $-5.8353101\times10^{-2}$ & $4.3798219\times10^{-2}$ \\
+SET \texttt{final\_g}   & $-6.8127618\times10^{1}$ & $-4.0590544\times10^{2}$ & $9.9833120\times10^{-1}$ & $-1.1097342\times10^{-5}$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{RESET to next cycle SET model}
+
+\begin{table}[H]
+\centering
+\scriptsize
+\caption{Internal standardized-input augmented matrix $B_z$ for
+$\mathrm{RESET}_n\rightarrow\mathrm{SET}_{n+1}$.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrr}
+\toprule
+Parameter row & SET \texttt{start\_v} & SET \texttt{final\_v} &
+SET \texttt{initial\_g} & SET \texttt{final\_g} \\
+\midrule
+Bias                    & $-1.3020136$ & $-1.4179357$ & $9.2125571\times10^{-6}$ & $2.6938806\times10^{-4}$ \\
+RESET \texttt{start\_v}   & $-4.0853368\times10^{-2}$ & $-1.2781042\times10^{-1}$ & $-5.2740346\times10^{-8}$ & $-1.3603142\times10^{-5}$ \\
+RESET \texttt{final\_v}   & $-9.7364351\times10^{-2}$ & $-9.6041945\times10^{-2}$ & $-1.1756680\times10^{-7}$ & $6.6429580\times10^{-6}$ \\
+RESET \texttt{initial\_g} & $-1.0294027\times10^{-2}$ & $3.1396460\times10^{-2}$ & $-1.0462224\times10^{-8}$ & $6.5854220\times10^{-5}$ \\
+RESET \texttt{final\_g}   & $2.2697735\times10^{-2}$ & $8.8000961\times10^{-3}$ & $5.9687178\times10^{-7}$ & $-8.3207503\times10^{-6}$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\begin{table}[H]
+\centering
+\scriptsize
+\caption{Original-input augmented matrix $B$ for
+$\mathrm{RESET}_n\rightarrow\mathrm{SET}_{n+1}$.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrr}
+\toprule
+Parameter row & SET \texttt{start\_v} & SET \texttt{final\_v} &
+SET \texttt{initial\_g} & SET \texttt{final\_g} \\
+\midrule
+Bias                    & $-7.9198533\times10^{-1}$ & $-4.1412154\times10^{-1}$ & $3.6725308\times10^{-6}$ & $2.1980500\times10^{-4}$ \\
+RESET \texttt{start\_v}   & $-1.8534415\times10^{-1}$ & $-5.7985215\times10^{-1}$ & $-2.3927316\times10^{-7}$ & $-6.1714930\times10^{-5}$ \\
+RESET \texttt{final\_v}   & $-2.8770439\times10^{-1}$ & $-2.8379677\times10^{-1}$ & $-3.4740112\times10^{-7}$ & $1.9629445\times10^{-5}$ \\
+RESET \texttt{initial\_g} & $-1.0301665\times10^{2}$ & $3.1419755\times10^{2}$ & $-1.0469986\times10^{-4}$ & $6.5903081\times10^{-1}$ \\
+RESET \texttt{final\_g}   & $2.7498398\times10^{4}$ & $1.0661353\times10^{4}$ & $7.2311260\times10^{-1}$ & $-1.0080623\times10^{1}$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Full-precision versions of all four matrices are stored as CSV files in \texttt{docs/results/}.
 
 \section{Work log}
 
@@ -495,8 +582,20 @@ This provides a justified baseline for a later nonlinear MLP experiment.
     the raw dataset.
 
     \item[9 September 2026] Converted the source code, plots, and project
-    documentation to English and consolidated both prediction tasks in the
-    project log.
+    documentation to English; consolidated both prediction tasks in the
+    project log; independently reconstructed and audited all temporal pairs;
+    added a combined cycle-domain comparison of measurements and predictions;
+    and extracted and verified the standardized-input and original-input
+    augmented parameter matrices for both linear models.
+
+    \item[10 September 2026] Reviewed and refined the English documentation,
+    including the data preparation, model interpretation, evaluation metrics,
+    and prediction plots.
+
+
+    \item[11 September 2026] Expanded the linear-algebra explanation and added
+    the explicit augmented parameter matrix $B$ with its biases and weights.
+
 \end{description}
 
 \end{document}

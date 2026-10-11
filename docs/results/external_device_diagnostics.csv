@@ -1,0 +1,5 @@
+scenario,task,devices,input_rows,rows_with_nan,rows_with_error,valid_pairs,rows_without_previous_operation,nonconsecutive_pairs,candidate_pairs_with_nan,candidate_pairs_with_error
+matched_condition,set_to_reset,4,11035,41.0,1.0,10994,,,,
+matched_condition,reset_to_next_set,4,11035,,,10971,4.0,0.0,60.0,2.0
+all_unseen_devices,set_to_reset,44,161204,1760.0,46.0,159440,,,,
+all_unseen_devices,reset_to_next_set,44,161204,,,158631,44.0,0.0,2529.0,42.0

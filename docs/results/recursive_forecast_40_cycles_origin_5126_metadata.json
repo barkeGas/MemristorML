@@ -1,0 +1,36 @@
+{
+  "dataset": "F2s_7_0.parquet",
+  "device": "F2s_7_0",
+  "RESET_pw": 1.0,
+  "RESET_target": 100.0,
+  "features": [
+    "start_v",
+    "final_v",
+    "initial_g",
+    "final_g"
+  ],
+  "origin_cycle": 5126,
+  "horizon_cycles": 40,
+  "first_forecast_cycle": 5127,
+  "last_forecast_cycle": 5166,
+  "model": "StandardScaler + LinearRegression (each direction)",
+  "set_to_reset": {
+    "training_rows": 4548,
+    "training_target_first_cycle": 0,
+    "training_target_last_cycle": 4556,
+    "test_first_cycle": 5126
+  },
+  "reset_to_next_set": {
+    "training_rows": 4544,
+    "training_target_first_cycle": 1,
+    "training_target_last_cycle": 4558,
+    "test_first_cycle": 5127
+  },
+  "protocol": "Train on first 80% of each task's valid pairs; middle 10% unused (no tuning); select earliest complete window in common final 10%, unless an origin is specified. No retraining during rollout.",
+  "forecast_inputs": "Only measured RESET at the origin, then predicted operations.",
+  "nonpositive_predicted_conductances": {
+    "SET": 0,
+    "RESET": 0
+  },
+  "limitations": "One fixed-origin window, not an average over forecast origins. No clipping, future measured inputs, or uncertainty intervals."
+}
